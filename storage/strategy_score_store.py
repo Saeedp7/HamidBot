@@ -50,3 +50,4 @@ class StrategyScoreStore:
         profile["last_updated"] = datetime.utcnow().isoformat()
         self.scores[strategy_name] = profile
         return profile
+

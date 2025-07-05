@@ -7,13 +7,10 @@ from typing import Dict, Any
 
 from services.grpc import strategy_manager_pb2, strategy_manager_pb2_grpc
 from engine.score_manager import ScoreManager
-
 from core.signal import Signal
 
 from risk.risk_manager import RiskManager
 from storage.strategy_score_store import StrategyScoreStore
-
-
 
 class ExecutionRouter:
     """Stub execution router that just prints orders."""
