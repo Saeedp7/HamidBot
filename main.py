@@ -29,6 +29,7 @@ def run_demo(use_real_api: bool = False):
 
     prices = [100, 101, 102, 103, 102, 101, 104, 105, 104]
     for price in prices:
+        print(price)
         engine.on_price_update(price)
 
 
