@@ -24,5 +24,5 @@ class DCAInvestmentBot(BaseStrategy):
         now = df.index[-1] if isinstance(df.index[-1], datetime) else datetime.utcnow()
         if self.last_buy is None or now - self.last_buy >= self.interval:
             self.last_buy = now
-            return Signal("buy", 0.3)
-        return Signal("hold")
+            return self._signal("buy", 0.3)
+        return self._signal("hold")

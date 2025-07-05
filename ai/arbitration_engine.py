@@ -39,4 +39,6 @@ class ArbitrationEngine:
         """Apply exponential decay to older performance."""
         for name in list(self.values.keys()):
             self.values[name] *= self.decay
+
             self.counts[name] = max(1, int(self.counts[name] * self.decay))
+

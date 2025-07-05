@@ -75,3 +75,4 @@ class RiskManager:
     def adjust_leverage(self, strategy_name: str) -> float:
         """Return dynamic leverage for a strategy."""
         return self.leverage_map.get(strategy_name, 1.0)
+

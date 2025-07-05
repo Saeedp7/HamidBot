@@ -14,7 +14,7 @@ class MeanReversionBot(BaseStrategy):
 
     def generate_signal(self, df: pd.DataFrame) -> Signal:
         if len(df) < self.window + 1:
-            return Signal("hold")
+            return self._signal("hold")
         close = df["close"]
         mean = close.rolling(self.window).mean().iloc[-1]
         std = close.rolling(self.window).std().iloc[-1]
@@ -24,7 +24,7 @@ class MeanReversionBot(BaseStrategy):
         vol = df["volume"].iloc[-1]
         price = close.iloc[-1]
         if price < lower and vol > vol_mean:
-            return Signal("buy", 0.5)
+            return self._signal("buy", 0.5)
         if price > upper and vol > vol_mean:
-            return Signal("sell", 0.5)
-        return Signal("hold")
+            return self._signal("sell", 0.5)
+        return self._signal("hold")

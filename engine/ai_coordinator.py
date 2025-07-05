@@ -8,6 +8,7 @@ from .score_manager import ScoreManager
 from ai.arbitration_engine import ArbitrationEngine
 from storage.strategy_score_store import StrategyScoreStore
 
+
 class AICoordinator:
     """Coordinate multiple strategies and rank signals."""
 
@@ -24,7 +25,7 @@ class AICoordinator:
     def choose_strategy(self, symbol: str, timeframe: str) -> BaseStrategy:
         name = self.arbitration_engine.select_strategy(symbol, timeframe, self.strategies.keys())
         return self.strategies[name]
-    
+
     def process(self, market_data: Dict[str, Any]) -> Dict[str, Signal]:
         signals: Dict[str, Signal] = {}
         for name, strat in self.strategies.items():
@@ -32,7 +33,13 @@ class AICoordinator:
             if data is None:
                 continue
             sig = strat.generate_signal(data)
-            signals[name] = sig if isinstance(sig, Signal) else Signal(str(sig))
+            if isinstance(sig, Signal):
+                signals[name] = sig
+            else:
+                signals[name] = strat._signal(action=str(sig))
+            print(
+                f"Generated signal {signals[name].action} ({signals[name].confidence:.2f}) for {signals[name].symbol} via {signals[name].strategy_name}"
+            )
         return signals
 
     def allocate(self, signals: Dict[str, Signal]) -> Dict[str, float]:
@@ -56,3 +63,4 @@ class AICoordinator:
         self.arbitration_engine.update_rewards(strategy_name, result)
         self.score_store.update_score(strategy_name, result)
         self.score_store.save()
+

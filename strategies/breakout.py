@@ -29,14 +29,14 @@ class BreakoutBot(BaseStrategy):
             for _, candle in df.tail(1).iterrows():
                 self.on_data(candle.to_dict())
         if len(self.highs) < self.window:
-            return Signal("hold")
+            return self._signal("hold")
         avg_vol = sum(self.volumes) / len(self.volumes)
         prev_high = max(list(self.highs)[:-1])
         prev_low = min(list(self.lows)[:-1])
         if self.close is None:
-            return Signal("hold")
+            return self._signal("hold")
         if self.close > prev_high and self.volumes[-1] > avg_vol * self.vol_mult:
-            return Signal("buy", 0.5)
+            return self._signal("buy", 0.5)
         if self.close < prev_low and self.volumes[-1] > avg_vol * self.vol_mult:
-            return Signal("sell", 0.5)
-        return Signal("hold")
+            return self._signal("sell", 0.5)
+        return self._signal("hold")
