@@ -1,36 +1,21 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union, Iterable, Tuple
 
+import os
 import pandas as pd
 
 from .fetch_api import get_klines
 
+# Create default raw data storage directory
 RAW_DATA_DIR = Path(__file__).resolve().parent / "raw"
 RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def fetch_market_data(symbol: str, interval: str, limit: int = 100,
                       force_refresh: bool = False) -> pd.DataFrame:
-    """Fetch OHLCV market data and cache the result.
-
-    Parameters
-    ----------
-    symbol : str
-        Trading pair symbol, e.g. ``"BTCUSDT"``.
-    interval : str
-        Kline interval, e.g. ``"1m"`` or ``"1h"``.
-    limit : int, optional
-        Number of data points to fetch, by default ``100``.
-    force_refresh : bool, optional
-        Ignore cached file and fetch from API, by default ``False``.
-
-    Returns
-    -------
-    pandas.DataFrame
-        DataFrame containing OHLCV data sorted by time.
-    """
+    """Fetch OHLCV market data and cache the result."""
     cache_file = RAW_DATA_DIR / f"{symbol}_{interval}_{limit}.csv"
     if cache_file.exists() and not force_refresh:
         return _load_cached(cache_file)
@@ -49,33 +34,23 @@ def _load_cached(path: Path) -> pd.DataFrame:
 
 def _convert_to_dataframe(rows: List[Dict[str, Any]]) -> pd.DataFrame:
     df = pd.DataFrame(rows)
-    # Ensure correct dtypes
     numeric_cols = [c for c in df.columns if c != "time"]
     df[numeric_cols] = df[numeric_cols].astype(float)
     df["time"] = pd.to_datetime(df["time"].astype(int), unit="ms")
     df = df.sort_values("time").reset_index(drop=True)
     return df
-=======
-import pandas as pd
-import os
-from api import bitunix_broker, binance_api
-from typing import Dict, Iterable, Tuple, Union
 
 
 class MarketDataCollector:
-    def __init__(self, fallback: bool = True):
-        self.fallback = fallback
+    def __init__(self, save_dir: Union[str, Path] = "data/raw"):
+        self.save_dir = Path(save_dir)
+        self.save_dir.mkdir(parents=True, exist_ok=True)
 
     def _get_single_ohlcv(
         self, symbol: str, timeframe: str, limit: int = 100, save: bool = True
     ) -> pd.DataFrame:
-        try:
-            data = bitunix_broker.fetch_ohlcv(symbol, timeframe, limit)
-        except Exception as e:
-            print(f"Bitunix failed: {e}")
-            if not self.fallback:
-                raise
-            data = binance_api.fetch_ohlcv(symbol, timeframe, limit)
+        # Only use get_klines now
+        data = get_klines(symbol, timeframe, limit)
 
         df = pd.DataFrame(
             data,
@@ -84,8 +59,7 @@ class MarketDataCollector:
         df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
 
         if save:
-            os.makedirs("data/raw", exist_ok=True)
-            df.to_csv(f"data/raw/{symbol}_{timeframe}.csv", index=False)
+            df.to_csv(self.save_dir / f"{symbol}_{timeframe}.csv", index=False)
 
         return df
 
@@ -122,6 +96,7 @@ def load_cached_or_fetch(
 
     symbols = [symbol] if isinstance(symbol, str) else list(symbol)
     timeframes = [timeframe] if isinstance(timeframe, str) else list(timeframe)
+
     results: Dict[Tuple[str, str], pd.DataFrame] = {}
     collector = MarketDataCollector()
     for sym in symbols:
@@ -132,4 +107,3 @@ def load_cached_or_fetch(
             else:
                 results[(sym, tf)] = collector.get_ohlcv(sym, tf, limit)
     return results
-
