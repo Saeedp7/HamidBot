@@ -21,20 +21,30 @@ class GridBot(BaseStrategy):
         self.last_level = None
 
     def generate_signal(self, df: pd.DataFrame) -> Signal:
-        if len(df) < 15:
+        try:
+            if not isinstance(df, pd.DataFrame) or len(df) < 15:
+                return self._signal("hold")
+            required = {"high", "low", "close"}
+            if not required.issubset(df.columns):
+                return self._signal("hold")
+            highs = df["high"].astype(float).tolist()
+            lows = df["low"].astype(float).tolist()
+            closes = df["close"].astype(float).tolist()
+            atr_val = atr(highs, lows, closes, 14)
+            if atr_val is None:
+                return self._signal("hold")
+            price = closes[-1]
+            grid_size = atr_val * self.grid_mult
+            if self.last_level is None:
+                self.last_level = price
+                return self._signal("hold")
+            if price >= self.last_level + grid_size:
+                self.last_level = price
+                return self._signal("sell", 0.5)
+            if price <= self.last_level - grid_size:
+                self.last_level = price
+                return self._signal("buy", 0.5)
             return self._signal("hold")
-        atr_val = atr(df["high"].tolist(), df["low"].tolist(), df["close"].tolist(), 14)
-        if atr_val is None:
+        except Exception as e:
+            print(f"Strategy {self.name} failed: {e}")
             return self._signal("hold")
-        price = df["close"].iloc[-1]
-        grid_size = atr_val * self.grid_mult
-        if self.last_level is None:
-            self.last_level = price
-            return self._signal("hold")
-        if price >= self.last_level + grid_size:
-            self.last_level = price
-            return self._signal("sell", 0.5)
-        if price <= self.last_level - grid_size:
-            self.last_level = price
-            return self._signal("buy", 0.5)
-        return self._signal("hold")

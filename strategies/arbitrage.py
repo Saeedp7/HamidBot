@@ -20,13 +20,22 @@ class ArbitrageBot(BaseStrategy):
         self.threshold = threshold
 
     def generate_signal(self, df: pd.DataFrame) -> Signal:
-        if df.empty:
+        try:
+            if not isinstance(df, pd.DataFrame) or df.empty:
+                return self._signal("hold")
+            prices: Dict[str, float] = (
+                df.iloc[-1].apply(pd.to_numeric, errors="coerce").dropna().to_dict()
+            )
+            if not prices:
+                return self._signal("hold")
+            max_ex = max(prices, key=prices.get)
+            min_ex = min(prices, key=prices.get)
+            min_price = prices[min_ex]
+            spread = prices[max_ex] - min_price
+            if min_price and spread / min_price > self.threshold:
+                confidence = min(1.0, spread / min_price)
+                return self._signal("buy", confidence)
             return self._signal("hold")
-        prices: Dict[str, float] = df.iloc[-1].to_dict()
-        max_ex = max(prices, key=prices.get)
-        min_ex = min(prices, key=prices.get)
-        spread = prices[max_ex] - prices[min_ex]
-        if prices[min_ex] and spread / prices[min_ex] > self.threshold:
-            confidence = min(1.0, spread / prices[min_ex])
-            return self._signal("buy", confidence)
+        except Exception as e:
+            print(f"Strategy {self.name} failed: {e}")
         return self._signal("hold")

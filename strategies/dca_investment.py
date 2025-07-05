@@ -21,8 +21,15 @@ class DCAInvestmentBot(BaseStrategy):
         self.last_buy: datetime | None = None
 
     def generate_signal(self, df: pd.DataFrame) -> Signal:
-        now = df.index[-1] if isinstance(df.index[-1], datetime) else datetime.utcnow()
-        if self.last_buy is None or now - self.last_buy >= self.interval:
-            self.last_buy = now
-            return self._signal("buy", 0.3)
-        return self._signal("hold")
+        try:
+            if not isinstance(df, pd.DataFrame) or df.empty:
+                return self._signal("hold")
+            idx = df.index[-1]
+            now = idx if isinstance(idx, datetime) else datetime.utcnow()
+            if self.last_buy is None or now - self.last_buy >= self.interval:
+                self.last_buy = now
+                return self._signal("buy", 0.3)
+            return self._signal("hold")
+        except Exception as e:
+            print(f"Strategy {self.name} failed: {e}")
+            return self._signal("hold")

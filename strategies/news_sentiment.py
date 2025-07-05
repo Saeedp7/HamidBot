@@ -19,15 +19,19 @@ class NewsSentimentBot(BaseStrategy):
         super().__init__("NewsSentimentBot", symbol, timeframe, risk_pct)
 
     def generate_signal(self, df: pd.DataFrame) -> Signal:
-        if not _sentiment or df.empty or "text" not in df.columns:
+        try:
+            if not _sentiment or not isinstance(df, pd.DataFrame) or df.empty or "text" not in df.columns:
+                return self._signal("hold")
+            texts: Iterable[str] = df["text"].astype(str).tolist()
+            joined = "\n".join(texts)
+            result = _sentiment(joined[:512])[0]
+            label = str(result.get("label", "neutral")).lower()
+            score = float(result.get("score", 0))
+            if label == "positive" and score > 0.6:
+                return self._signal("buy", score)
+            if label == "negative" and score > 0.6:
+                return self._signal("sell", score)
             return self._signal("hold")
-        texts: Iterable[str] = df["text"].astype(str).tolist()
-        joined = "\n".join(texts)
-        result = _sentiment(joined[:512])[0]
-        label = result.get("label", "neutral").lower()
-        score = float(result.get("score", 0))
-        if label == "positive" and score > 0.6:
-            return self._signal("buy", score)
-        if label == "negative" and score > 0.6:
-            return self._signal("sell", score)
-        return self._signal("hold")
+        except Exception as e:
+            print(f"Strategy {self.name} failed: {e}")
+            return self._signal("hold")

@@ -21,16 +21,20 @@ class MeanReversionStrategy(BaseStrategy):
         self.prices.append(price)
 
     def generate_signal(self, df: pd.DataFrame) -> Signal:
-        if "close" not in df.columns or len(df) < self.window:
+        try:
+            if not isinstance(df, pd.DataFrame) or "close" not in df.columns or len(df) < self.window:
+                return self._signal("hold")
+            prices = df["close"].astype(float).iloc[-self.window :].tolist()
+            sma = simple_moving_average(prices, self.window)
+            if sma is None:
+                return self._signal("hold")
+            last_price = prices[-1]
+            if last_price < sma * (1 - self.threshold):
+                return self._signal("buy")
+            if last_price > sma * (1 + self.threshold):
+                return self._signal("sell")
             return self._signal("hold")
-        prices = df["close"].iloc[-self.window :].tolist()
-        sma = simple_moving_average(prices, self.window)
-        if sma is None:
+        except Exception as e:
+            print(f"Strategy {self.name} failed: {e}")
             return self._signal("hold")
-        last_price = prices[-1]
-        if last_price < sma * (1 - self.threshold):
-            return self._signal("buy")
-        if last_price > sma * (1 + self.threshold):
-            return self._signal("sell")
-        return self._signal("hold")
 
