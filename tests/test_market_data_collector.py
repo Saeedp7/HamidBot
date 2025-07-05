@@ -10,6 +10,7 @@ def test_get_ohlcv_creates_file(tmp_path):
     # Use tmp_path for raw and save dir
     raw_dir = tmp_path / "raw"
     raw_dir.mkdir()
+
     collector = MarketDataCollector(raw_save_dir=raw_dir, save_dir=raw_dir)
 
     df = collector.get_ohlcv("BTCUSDT", "1m", limit=1)
