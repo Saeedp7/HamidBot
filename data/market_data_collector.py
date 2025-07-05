@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Dict, Any, Union, Iterable, Tuple
+from typing import Any, Dict, Iterable, List, Tuple, Union
 
 import os
 import pandas as pd
 
 from .fetch_api import get_klines
+from .feature_engineering import preprocess_and_engineer_features
 
 # Create default raw data storage directory
 RAW_DATA_DIR = Path(__file__).resolve().parent / "raw"
