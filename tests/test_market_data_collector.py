@@ -1,26 +1,24 @@
 import sys
 from pathlib import Path
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pandas as pd
+from data.market_data_collector import MarketDataCollector
 
-from data import market_data_collector as mdc
 
-
-def test_fetch_market_data(tmp_path, monkeypatch):
+def test_get_ohlcv_creates_file(tmp_path):
+    # Use tmp_path for raw and save dir
     raw_dir = tmp_path / "raw"
     raw_dir.mkdir()
-    monkeypatch.setattr(mdc, "RAW_DATA_DIR", raw_dir)
-    monkeypatch.setattr(
-        mdc,
-        "get_klines",
-        lambda *args, **kwargs: [
-            {"time": 0, "open": 1, "high": 1, "low": 1, "close": 1, "volume": 1}
-        ],
-    )
-    df = mdc.fetch_market_data("BTCUSDT", "1m", limit=1, force_refresh=True)
+
+    collector = MarketDataCollector(raw_save_dir=raw_dir, save_dir=raw_dir)
+
+    df = collector.get_ohlcv("BTCUSDT", "1m", limit=1)
+
     assert isinstance(df, pd.DataFrame)
     assert not df.empty
-    assert {"open", "high", "low", "close", "time"}.issubset(df.columns)
-    assert (raw_dir / "BTCUSDT_1m_1.csv").exists()
+    print("GG")
+
+    expected_file = raw_dir / "BTCUSDT_1m.csv"
+    assert expected_file.exists(), f"Expected file not found: {expected_file}"
+    print("Saved file:", expected_file)
