@@ -24,10 +24,9 @@ class BreakoutBot(BaseStrategy):
         self.volumes.append(candle["volume"])
         self.close = candle["close"]
 
-    def generate_signal(self, df: pd.DataFrame | None = None) -> Signal:
-        if df is not None:
-            for _, candle in df.tail(1).iterrows():
-                self.on_data(candle.to_dict())
+    def generate_signal(self, df: pd.DataFrame) -> Signal:
+        for _, candle in df.tail(1).iterrows():
+            self.on_data(candle.to_dict())
         if len(self.highs) < self.window:
             return self._signal("hold")
         avg_vol = sum(self.volumes) / len(self.volumes)

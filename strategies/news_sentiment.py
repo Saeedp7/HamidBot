@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Iterable
+import pandas as pd
 
 from .base import BaseStrategy, Signal
 
@@ -17,9 +18,10 @@ class NewsSentimentBot(BaseStrategy):
     def __init__(self, symbol: str, timeframe: str = "1h", risk_pct: float = 0.01) -> None:
         super().__init__("NewsSentimentBot", symbol, timeframe, risk_pct)
 
-    def generate_signal(self, texts: Iterable[str]) -> Signal:
-        if not _sentiment or not texts:
+    def generate_signal(self, df: pd.DataFrame) -> Signal:
+        if not _sentiment or df.empty or "text" not in df.columns:
             return self._signal("hold")
+        texts: Iterable[str] = df["text"].astype(str).tolist()
         joined = "\n".join(texts)
         result = _sentiment(joined[:512])[0]
         label = result.get("label", "neutral").lower()

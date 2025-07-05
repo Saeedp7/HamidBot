@@ -2,6 +2,7 @@
 
 from collections import deque
 from typing import Deque
+import pandas as pd
 
 from .base import BaseStrategy, Signal
 from utils.indicators import simple_moving_average
@@ -19,13 +20,14 @@ class MeanReversionStrategy(BaseStrategy):
     def on_data(self, price: float) -> None:  # type: ignore[override]
         self.prices.append(price)
 
-    def generate_signal(self) -> Signal:  # type: ignore[override]
-        if len(self.prices) < self.window:
+    def generate_signal(self, df: pd.DataFrame) -> Signal:
+        if "close" not in df.columns or len(df) < self.window:
             return self._signal("hold")
-        sma = simple_moving_average(list(self.prices), self.window)
+        prices = df["close"].iloc[-self.window :].tolist()
+        sma = simple_moving_average(prices, self.window)
         if sma is None:
             return self._signal("hold")
-        last_price = self.prices[-1]
+        last_price = prices[-1]
         if last_price < sma * (1 - self.threshold):
             return self._signal("buy")
         if last_price > sma * (1 + self.threshold):
