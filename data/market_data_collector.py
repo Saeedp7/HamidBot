@@ -53,24 +53,34 @@ class MarketDataCollector:
         # Only use get_klines now
         data = get_klines(symbol, timeframe, limit)
 
-        df = pd.DataFrame(
-            data,
-            columns=["timestamp", "open", "high", "low", "close", "volume"],
-        )
-        df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+        df = pd.DataFrame(data)
+        df = df.rename(columns={
+            "time": "timestamp",
+            "baseVol": "volume"
+        })
+        expected = ["timestamp", "open", "high", "low", "close", "volume"]
+        for col in expected:
+            if col not in df.columns:
+                raise ValueError(f"Missing required column: {col}")
+        df["timestamp"] = pd.to_datetime(df["timestamp"].astype(int), unit="ms")
+        df[["open", "high", "low", "close", "volume"]] = df[["open", "high", "low", "close", "volume"]].astype(float)
+        print("RAW API response sample:", data[:2])
 
         if save:
             # Save raw CSV
             self.save_dir.mkdir(parents=True, exist_ok=True)
             raw_path = self.save_dir / f"{symbol}_{timeframe}.csv"
             df.to_csv(raw_path, index=False)
+        # Run feature engineering on the fetched data
+        processed_df = preprocess_and_engineer_features(df)
 
-            # Process & Save to data/processed
-            processed_dir = Path("data/processed")
-            processed_dir.mkdir(parents=True, exist_ok=True)
-            processed_df = preprocess_and_engineer_features(df)
-            processed_path = processed_dir / f"{symbol}_{timeframe}_features.csv"
-            processed_df.to_csv(processed_path, index=False)
+        # Save processed dataset for later use
+        if save:
+            os.makedirs("data/processed", exist_ok=True)
+            processed_df.to_csv(
+                f"data/processed/{symbol}_{timeframe}.csv", index=False
+            )
+
 
         return df
 
