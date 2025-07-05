@@ -3,6 +3,7 @@ from execution.order_manager import OrderManager
 from engine.bot_engine import BotEngine
 from risk.risk_manager import RiskManager
 from strategies.ema_crossover import EMACrossoverStrategy
+from execution.bitunix_broker import BitunixBroker
 
 
 class DummyBroker(BrokerAPI):
@@ -19,9 +20,9 @@ class DummyBroker(BrokerAPI):
         return order
 
 
-def run_demo():
+def run_demo(use_real_api: bool = False):
     strategy = EMACrossoverStrategy()
-    broker = DummyBroker()
+    broker = BitunixBroker() if use_real_api else DummyBroker()
     order_manager = OrderManager(broker)
     risk_manager = RiskManager()
     engine = BotEngine(strategy, order_manager, risk_manager)
@@ -32,4 +33,5 @@ def run_demo():
 
 
 if __name__ == "__main__":
+    # Set use_real_api=True to place real orders using Bitunix
     run_demo()
