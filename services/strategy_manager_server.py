@@ -7,7 +7,8 @@ from typing import Dict, Any
 
 from services.grpc import strategy_manager_pb2, strategy_manager_pb2_grpc
 from engine.score_manager import ScoreManager
-
+from risk.risk_manager import RiskManager
+from storage.strategy_score_store import StrategyScoreStore
 
 class ExecutionRouter:
     """Stub execution router that just prints orders."""
@@ -22,27 +23,26 @@ class StrategyManager(strategy_manager_pb2_grpc.StrategyManagerServicer):
         self.scores_file = scores_file
         self.log_file = log_file
         self.score_manager = ScoreManager()
+        self.score_store = StrategyScoreStore(scores_file)
         self.execution_router = ExecutionRouter()
+        self.risk_manager = RiskManager()
         self.risk_profiles = {
             "default": {"max_risk": 0.02, "preferred_timeframes": ["1m", "5m"]},
         }
         self.active_symbols: Dict[str, str] = {}
+        self.daily_loss = 0.0
         self._load_scores()
         self._log_writer = None
 
     # ------------------------------------------------------------------
     def _load_scores(self) -> None:
-        try:
-            with open(self.scores_file, "r") as f:
-                data = json.load(f)
-            for name, score in data.items():
-                self.score_manager.scores[name] = score
-        except FileNotFoundError:
-            pass
-
+        self.score_store.load()
+        for name, profile in self.score_store.scores.items():
+            self.score_manager.scores[name] = profile.get("avg_return", 0.0)
     def _save_scores(self) -> None:
-        with open(self.scores_file, "w") as f:
-            json.dump(self.score_manager.get_all(), f)
+        for name, value in self.score_manager.get_all().items():
+            self.score_store.update_score(name, value)
+        self.score_store.save()
 
     def _get_log_writer(self) -> csv.writer:
         if self._log_writer is None:
@@ -69,7 +69,14 @@ class StrategyManager(strategy_manager_pb2_grpc.StrategyManagerServicer):
         scores = self.score_manager.get_all()
         top_total = sum(scores.values())
         allocation = self.capital * (score / top_total) if top_total else 0.0
-        size = allocation / request.entry_price if request.entry_price else 0.0
+        volatility = abs(request.entry_price - request.sl) if request.sl else request.entry_price * 0.01
+        qty = self.risk_manager.compute_position_size(request.confidence, volatility, allocation)
+        leverage = self.risk_manager.adjust_leverage(name)
+        size = qty * leverage
+
+        # risk check: max drawdown
+        if not self.risk_manager.enforce_max_drawdown(self.daily_loss, None):
+            return strategy_manager_pb2.ExecutionResponse(message="drawdown limit")
 
         # basic safety: prevent duplicate orders per symbol
         last_side = self.active_symbols.get(request.symbol)
@@ -86,6 +93,7 @@ class StrategyManager(strategy_manager_pb2_grpc.StrategyManagerServicer):
             "tp": request.tp,
         }
         self.execution_router.execute(order)
+        self.daily_loss += -reward if reward < 0 else 0.0
 
         writer = self._get_log_writer()
         writer.writerow([
@@ -97,6 +105,7 @@ class StrategyManager(strategy_manager_pb2_grpc.StrategyManagerServicer):
             request.sl,
             request.tp,
         ])
+        self.score_store.update_score(name, reward)
         self._save_scores()
         exec_order = strategy_manager_pb2.ExecutionOrder(**order)
         return strategy_manager_pb2.ExecutionResponse(orders=[exec_order], message="ok")
