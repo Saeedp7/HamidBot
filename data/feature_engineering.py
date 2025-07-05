@@ -24,7 +24,8 @@ def preprocess_and_engineer_features(df: pd.DataFrame, freq: str = "1min") -> pd
         pd.DataFrame: Cleaned and feature-enriched DataFrame
     """
     df = df.copy()
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+    df = df.dropna(subset=["timestamp"])
     df = df.set_index("timestamp")
     df = df.sort_index()
 

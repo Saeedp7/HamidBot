@@ -60,7 +60,17 @@ class MarketDataCollector:
         df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
 
         if save:
-            df.to_csv(self.save_dir / f"{symbol}_{timeframe}.csv", index=False)
+            # Save raw CSV
+            self.save_dir.mkdir(parents=True, exist_ok=True)
+            raw_path = self.save_dir / f"{symbol}_{timeframe}.csv"
+            df.to_csv(raw_path, index=False)
+
+            # Process & Save to data/processed
+            processed_dir = Path("data/processed")
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            processed_df = preprocess_and_engineer_features(df)
+            processed_path = processed_dir / f"{symbol}_{timeframe}_features.csv"
+            processed_df.to_csv(processed_path, index=False)
 
         return df
 
