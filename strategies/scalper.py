@@ -43,15 +43,15 @@ class ScalperBot(BaseStrategy):
 
     def generate_signal(self, df: pd.DataFrame) -> Signal:
         if df.empty or len(df) < self.slow + 1:
-            return Signal("hold")
+            return self._signal("hold")
         ema_fast = df["close"].ewm(span=self.fast, adjust=False).mean().iloc[-1]
         ema_slow = df["close"].ewm(span=self.slow, adjust=False).mean().iloc[-1]
         vol = self._volatility(df)
         if vol is None or vol > self.vol_threshold:
-            return Signal("hold")
+            return self._signal("hold")
         sl, tp = self._atr_levels(df)
         if ema_fast > ema_slow:
-            return Signal("buy", 0.7, sl, tp)
+            return self._signal("buy", 0.7, sl, tp)
         if ema_fast < ema_slow:
-            return Signal("sell", 0.7, sl, tp)
-        return Signal("hold")
+            return self._signal("sell", 0.7, sl, tp)
+        return self._signal("hold")
