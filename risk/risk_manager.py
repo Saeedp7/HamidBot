@@ -4,7 +4,7 @@ from utils.indicators import atr
 
 
 class RiskManager:
-    """Position sizing using ATR-based stop loss and take profit."""
+    """Position sizing and drawdown enforcement utilities."""
 
     def __init__(
         self,
@@ -13,12 +13,16 @@ class RiskManager:
         atr_period: int = 14,
         sl_mult: float = 1.0,
         tp_mult: float = 2.0,
+        max_daily_drawdown: float = 0.1,
+        leverage_map: dict[str, float] | None = None,
     ) -> None:
         self.max_position = max_position
         self.risk_percent = risk_percent
         self.atr_period = atr_period
         self.sl_mult = sl_mult
         self.tp_mult = tp_mult
+        self.max_daily_drawdown = max_daily_drawdown
+        self.leverage_map = leverage_map or {}
 
     def size_position(
         self,
@@ -53,3 +57,20 @@ class RiskManager:
         sl = price - atr_val * self.sl_mult
         tp = price + atr_val * self.tp_mult
         return sl, tp
+
+    # ------------------------------------------------------------------
+    def compute_position_size(self, confidence: float, volatility: float, balance: float) -> float:
+        """Return lot size based on confidence-adjusted risk."""
+        risk_pct = self.risk_percent * max(0.0, min(confidence, 1.0))
+        risk_per_unit = volatility if volatility > 0 else 1.0
+        qty = (balance * risk_pct) / risk_per_unit
+        return min(qty, self.max_position)
+
+    def enforce_max_drawdown(self, daily_loss: float, max_loss: float | None = None) -> bool:
+        """Return True if trading is allowed based on daily loss."""
+        limit = max_loss if max_loss is not None else self.max_daily_drawdown
+        return daily_loss < limit
+
+    def adjust_leverage(self, strategy_name: str) -> float:
+        """Return dynamic leverage for a strategy."""
+        return self.leverage_map.get(strategy_name, 1.0)
