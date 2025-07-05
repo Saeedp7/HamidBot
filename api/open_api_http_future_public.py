@@ -1,8 +1,8 @@
 from typing import Dict, Optional, Any
 import requests
-from config import Config
-from error_codes import ErrorCode
-from open_api_http_sign import get_auth_headers, sort_params
+from api.config import Config
+from api.error_codes import ErrorCode
+from api.open_api_http_sign import get_auth_headers, sort_params
 import logging
 import asyncio
 import time
