@@ -52,7 +52,7 @@ class MarketDataCollector:
         self.raw_save_dir = raw_save_dir
 
     def _get_single_ohlcv(
-        self, symbol: str, timeframe: str, limit: int = 100, save: bool = True
+        self, symbol: str, timeframe: str, limit: int = 200, save: bool = True
     ) -> pd.DataFrame:
         # Only use get_klines now
         data = get_klines(symbol, timeframe, limit)
@@ -94,7 +94,7 @@ class MarketDataCollector:
         self,
         symbol: Union[str, Iterable[str]],
         timeframe: Union[str, Iterable[str]],
-        limit: int = 100,
+        limit: int = 200,
         save: bool = True,
     ) -> Union[pd.DataFrame, Dict[Tuple[str, str], pd.DataFrame]]:
         if isinstance(symbol, str) and isinstance(timeframe, str):
