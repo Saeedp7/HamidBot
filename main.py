@@ -47,7 +47,7 @@ def run_demo(use_real_api: bool = False, use_collector: bool = True) -> None:
     engine = BotEngine(strategy, order_manager, risk_manager)
 
     if use_collector:
-        collector = MarketDataCollector("BTCUSDT", timeframe="1m", limit=20)
+        collector = MarketDataCollector("ETHUSDT", timeframe="5m", limit=20)
         candles = collector.fetch_ohlcv()
         logger.info("Fetched %d candles", len(candles))
         logger.info("First candle: %s", candles[0] if candles else "no data")
