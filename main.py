@@ -70,9 +70,10 @@ def run_demo(use_real_api: bool = False, use_collector: bool = True) -> None:
     risk_manager = RiskManager()
 
     if use_collector:
-        collector = MarketDataCollector("ETHUSDT", timeframe="5m", limit=20)
-        candles = collector.fetch_ohlcv()
-        logger.info("Fetched %d candles", len(candles))
+        collector = MarketDataCollector()
+        df = collector.get_ohlcv("ETHUSDT", "5m", 20)
+        candles = df.to_dict("records")
+        logger.info("Fetched %d candles", len(df))
         logger.info("First candle: %s", candles[0] if candles else "no data")
     else:
         candles = [[0, p, p, p, p, 1] for p in [100, 101, 102, 103, 102, 101, 104, 105, 104]]
