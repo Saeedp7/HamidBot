@@ -11,6 +11,12 @@ from analysis.replay_engine import ReplayEngine
 from utils.trade_logger import TradeLogger
 from data.market_data_collector import MarketDataCollector
 from utils.logger import get_logger
+from utils.telegram_notifier import TelegramNotifier
+from dashboard.dashboard import metrics, start_dashboard
+import schedule
+import threading
+import os
+import time
 
 class DummyBroker:
     """Very naive broker for demonstration."""
@@ -87,10 +93,22 @@ def run_demo(use_real_api: bool = False, use_collector: bool = True) -> None:
     active_strategy = selector.select()
     logger.info("Selected strategy: %s", active_strategy.name)
 
-    engine = BotEngine(active_strategy, order_manager, risk_manager)
+    token = os.environ.get("TELEGRAM_TOKEN")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    notifier = None
+    if token and chat_id:
+        notifier = TelegramNotifier(token, chat_id, metrics)
+        notifier.schedule_summary()
+
+    dashboard_thread = threading.Thread(target=start_dashboard, daemon=True)
+    dashboard_thread.start()
+
+    engine = BotEngine(active_strategy, order_manager, risk_manager, metrics, notifier)
     for price in prices:
         logger.info("Price %.2f (%s)", price, regime_detector.detect())
         engine.on_price_update(price)
+        schedule.run_pending()
+        time.sleep(0.1)
 
     trade_logger.close()
 
