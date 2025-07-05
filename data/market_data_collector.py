@@ -1,6 +1,6 @@
 import pandas as pd
 import os
-from api import bitunix_broker, binance_api
+from api import coinex_api, binance_api
 from typing import Dict, Iterable, Tuple, Union
 
 
@@ -12,9 +12,9 @@ class MarketDataCollector:
         self, symbol: str, timeframe: str, limit: int = 100, save: bool = True
     ) -> pd.DataFrame:
         try:
-            data = bitunix_broker.fetch_ohlcv(symbol, timeframe, limit)
+            data = coinex_api.fetch_ohlcv(symbol, timeframe, limit)
         except Exception as e:
-            print(f"Bitunix failed: {e}")
+            print(f"Coinex failed: {e}")
             if not self.fallback:
                 raise
             data = binance_api.fetch_ohlcv(symbol, timeframe, limit)
