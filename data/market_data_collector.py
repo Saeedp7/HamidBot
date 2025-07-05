@@ -1,5 +1,9 @@
 import pandas as pd
 import os
+from api import bitunix_broker, binance_api
+from typing import Dict, Iterable, Tuple, Union
+import pandas as pd
+import os
 from api import coinex_api, binance_api
 from typing import Dict, Iterable, Tuple, Union
 
