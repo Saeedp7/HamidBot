@@ -18,7 +18,8 @@ auto_trade_bot/
 │ └── risk_manager.py
 ├── execution/ # Order management and broker API integration
 │ ├── order_manager.py
-│ └── broker_api.py
+│ ├── broker_api.py
+│ └── bitunix_broker.py
 ├── utils/ # Utility functions (TA indicators, logging)
 │ ├── indicators.py
 │ └── logger.py
@@ -55,3 +56,8 @@ python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 python main.py
+```
+
+### Broker API Configuration
+
+The project includes a ready-made integration with the Bitunix exchange under the `api/` directory. Fill in your API credentials in `api/config.yaml` and run `main.py` with `use_real_api=True` to enable real trading.
