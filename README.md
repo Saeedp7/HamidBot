@@ -60,4 +60,18 @@ python main.py
 
 ### Broker API Configuration
 
-The project includes a ready-made integration with the Bitunix exchange under the `api/` directory. Fill in your API credentials in `api/config.yaml` and run `main.py` with `use_real_api=True` to enable real trading.
+The project includes a ready-made integration with the Bitunix exchange under the `api/` directory. You can either store credentials in `api/config.yaml` or set the environment variables `BITUNIX_API_KEY` and `BITUNIX_SECRET_KEY`. Run `main.py` with `use_real_api=True` to enable real trading.
+
+### Strategy Optimization
+
+You can test different strategy parameters against historical data using `analysis/optimizer.py`:
+
+```python
+from analysis.optimizer import StrategyOptimizer
+from strategies.ema_crossover import EMACrossoverStrategy
+
+grid = {"fast": [10, 12, 14], "slow": [26, 30]}
+opt = StrategyOptimizer(EMACrossoverStrategy, grid, "BTC-USD", "2024-01-01", "2024-06-30")
+best_params, score = opt.optimize()
+print(best_params, score)
+```
