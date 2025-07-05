@@ -75,3 +75,21 @@ opt = StrategyOptimizer(EMACrossoverStrategy, grid, "BTC-USD", "2024-01-01", "20
 best_params, score = opt.optimize()
 print(best_params, score)
 ```
+
+## 🛰️ Strategy Manager gRPC Service
+
+The project includes a lightweight gRPC server that allows external strategy bots to
+submit trading signals. The `StrategyManager` scores each signal, allocates
+capital, and returns execution instructions.
+
+Start the service:
+```bash
+python services/strategy_manager_server.py
+```
+Send a test signal:
+```bash
+python services/strategy_client_example.py
+```
+The server keeps running scores in `strategy_scores.json` and logs all decisions to
+`execution_log.csv` for auditability.
+
