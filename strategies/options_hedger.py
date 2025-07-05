@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from typing import Optional
+import pandas as pd
 
 from .base import BaseStrategy, Signal
 
@@ -19,14 +20,15 @@ class OptionsHedgerBot(BaseStrategy):
     def __init__(self, symbol: str, timeframe: str = "1h", risk_pct: float = 0.02) -> None:
         super().__init__("OptionsHedgerBot", symbol, timeframe, risk_pct)
 
-    def generate_signal(self, data: dict) -> Signal:
-        if not implied_volatility or not delta:
+    def generate_signal(self, df: pd.DataFrame) -> Signal:
+        if not implied_volatility or not delta or df.empty:
             return self._signal("hold")
-        spot = data.get("spot")
-        option_price = data.get("option_price")
-        strike = data.get("strike")
-        t = data.get("t", 0.0)
-        r = data.get("r", 0.0)
+        row = df.iloc[-1]
+        spot = row.get("spot")
+        option_price = row.get("option_price")
+        strike = row.get("strike")
+        t = row.get("t", 0.0)
+        r = row.get("r", 0.0)
         if not all(v is not None for v in [spot, option_price, strike]):
             return self._signal("hold")
         try:
