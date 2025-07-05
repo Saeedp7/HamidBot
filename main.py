@@ -1,23 +1,23 @@
-from execution.broker_api import BrokerAPI
+from api.broker_api import BrokerAPI
 from execution.order_manager import OrderManager
 from engine.bot_engine import BotEngine
 from risk.risk_manager import RiskManager
 from strategies.ema_crossover import EMACrossoverStrategy
-from execution.bitunix_broker import BitunixBroker
+from utils.trade_logger import TradeLogger
 from data.market_data_collector import MarketDataCollector
 from utils.logger import get_logger
 
-class DummyBroker(BrokerAPI):
-    """A very naive broker implementation for demonstration."""
+class DummyBroker:
+    """Very naive broker for demonstration."""
 
-    def buy(self, symbol: str, qty: float, price: float | None = None):
-        order = {"side": "BUY", "symbol": symbol, "qty": qty, "price": price}
-        print(f"Buying: {order}")
+    def market_order(self, symbol: str, side: str, qty: float):
+        order = {"side": side, "symbol": symbol, "qty": qty, "price": None}
+        print(f"Market order: {order}")
         return order
 
-    def sell(self, symbol: str, qty: float, price: float | None = None):
-        order = {"side": "SELL", "symbol": symbol, "qty": qty, "price": price}
-        print(f"Selling: {order}")
+    def limit_order(self, symbol: str, side: str, qty: float, price: float):
+        order = {"side": side, "symbol": symbol, "qty": qty, "price": price}
+        print(f"Limit order: {order}")
         return order
     
 def _extract_close(candle: object) -> float | None:
@@ -40,8 +40,9 @@ def _extract_close(candle: object) -> float | None:
 def run_demo(use_real_api: bool = False, use_collector: bool = True) -> None:
     logger = get_logger("main")
     strategy = EMACrossoverStrategy()
-    broker = BitunixBroker() if use_real_api else DummyBroker()
-    order_manager = OrderManager(broker)
+    broker = BrokerAPI() if use_real_api else DummyBroker()
+    trade_logger = TradeLogger()
+    order_manager = OrderManager(broker, logger=trade_logger)
     risk_manager = RiskManager()
     engine = BotEngine(strategy, order_manager, risk_manager)
 
@@ -57,7 +58,9 @@ def run_demo(use_real_api: bool = False, use_collector: bool = True) -> None:
         logger.info("Price %.2f", price)
         engine.on_price_update(price)
 
+    trade_logger.close()
+
 
 if __name__ == "__main__":
-    # Set use_real_api=True to place real orders using Bitunix
+    # Set use_real_api=True to place real orders on Bitunix
     run_demo()
