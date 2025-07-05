@@ -5,7 +5,7 @@ import ssl
 import time
 import websockets
 from typing import Dict, Any, List
-from config import Config
+from api.config import Config
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')

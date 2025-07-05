@@ -1,6 +1,7 @@
 import yaml
 from typing import Dict, Any
 import os
+import logging
 
 class Config:
     def __init__(self, config_path: str = "config.yaml"):
@@ -12,6 +13,13 @@ class Config:
         """
         self.config_path = config_path
         self.config_data = self._load_config()
+        # allow overriding credentials via environment variables
+        env_api = os.getenv("BITUNIX_API_KEY")
+        env_secret = os.getenv("BITUNIX_SECRET_KEY")
+        if env_api:
+            self.config_data.setdefault("credentials", {})["api_key"] = env_api
+        if env_secret:
+            self.config_data.setdefault("credentials", {})["secret_key"] = env_secret
         
     def _load_config(self) -> Dict[str, Any]:
         """
@@ -25,23 +33,25 @@ class Config:
             yaml.YAMLError: Configuration file format error
         """
         if not os.path.exists(self.config_path):
-            raise FileNotFoundError(f"Configuration file does not exist: {self.config_path}")
+            logging.warning("Configuration file %s not found, using defaults", self.config_path)
+            return {}
             
         try:
             with open(self.config_path, 'r', encoding='utf-8') as f:
                 return yaml.safe_load(f)
         except yaml.YAMLError as e:
-            raise yaml.YAMLError(f"Configuration file format error: {e}")
+            logging.error("Configuration file format error: %s", e)
+            return {}
             
     @property
     def api_key(self) -> str:
         """Get API Key"""
-        return self.config_data.get('credentials', {}).get('api_key', '')
+        return os.getenv("BITUNIX_API_KEY", self.config_data.get('credentials', {}).get('api_key', ''))
         
     @property
     def secret_key(self) -> str:
         """Get Secret Key"""
-        return self.config_data.get('credentials', {}).get('secret_key', '')
+        return os.getenv("BITUNIX_SECRET_KEY", self.config_data.get('credentials', {}).get('secret_key', ''))
         
     @property
     def public_ws_uri(self) -> str:

@@ -1,9 +1,9 @@
 import json
 from typing import Dict, Optional, Any, List
 import requests
-from config import Config
-from error_codes import ErrorCode
-from open_api_http_sign import get_auth_headers, sort_params
+from api import config
+from api.error_codes import ErrorCode
+from api.open_api_http_sign import get_auth_headers, sort_params
 import logging
 import asyncio
 
@@ -11,7 +11,7 @@ import asyncio
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
 
 class OpenApiHttpFuturePrivate:
-    def __init__(self, config: Config):
+    def __init__(self, config: config):
         """
         Initialize OpenApiHttpFuturePrivate class
         
@@ -206,7 +206,7 @@ class OpenApiHttpFuturePrivate:
 async def main():
     """Main function example"""
     # Load configuration
-    config = Config()
+    config = config()
     
     # Create client
     client = OpenApiHttpFuturePrivate(config)

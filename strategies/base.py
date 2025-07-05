@@ -7,11 +7,15 @@ class BaseStrategy:
     def on_data(self, price: float) -> None:
         """Receive new price data."""
         raise NotImplementedError
-
+    
+    def generate_signal(self) -> str:
+        """Return 'buy', 'sell' or 'hold' based on latest data."""
+        raise NotImplementedError
+    
     def should_buy(self) -> bool:
         """Return True if a buy signal is generated."""
-        return False
+        return self.generate_signal() == "buy"
 
     def should_sell(self) -> bool:
         """Return True if a sell signal is generated."""
-        return False
+        return self.generate_signal() == "sell"
