@@ -1,6 +1,6 @@
 credentials:
-  api_key: your_api_key
-  secret_key: your_secret_key
+  api_key: 6738916d3f9d354223cadde2ec28aabb
+  secret_key: d5c70f1eef15abc72569a6ce9f07f933
 
 websocket:
   public_uri: wss://fapi.bitunix.com/public/
