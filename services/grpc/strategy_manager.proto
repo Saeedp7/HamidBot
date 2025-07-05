@@ -1,0 +1,30 @@
+syntax = "proto3";
+package strategy;
+
+message SignalMessage {
+  string strategy_name = 1;
+  string symbol = 2;
+  string timeframe = 3;
+  string signal_type = 4; // buy or sell
+  double confidence = 5;
+  double entry_price = 6;
+  double sl = 7;
+  double tp = 8;
+}
+
+message ExecutionOrder {
+  string symbol = 1;
+  string side = 2;
+  double size = 3;
+  double sl = 4;
+  double tp = 5;
+}
+
+message ExecutionResponse {
+  repeated ExecutionOrder orders = 1;
+  string message = 2;
+}
+
+service StrategyManager {
+  rpc SendSignal (SignalMessage) returns (ExecutionResponse);
+}
