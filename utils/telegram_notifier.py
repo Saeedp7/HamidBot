@@ -1,43 +1,67 @@
-from __future__ import annotations
+import requests
+import time
+import os
+from collections import deque
+from datetime import datetime
 
-from typing import Optional
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-import schedule
-from telegram import Bot
-from telegram.error import TelegramError
+telegram_queue: deque[dict] = deque()
+MAX_RETRIES = 3
+
+def _send_telegram(message: str) -> bool:
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return False
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
+    try:
+        resp = requests.post(url, json=payload, timeout=10)
+        return resp.status_code == 200
+    except Exception:
+        return False
+
+def send_telegram_alert(message: str) -> None:
+    """Send ``message`` immediately via Telegram or queue for retry."""
+    if not _send_telegram(message):
+        telegram_queue.append({"msg": message, "retries": 0, "ts": datetime.utcnow()})
+
+def _notify(message: str) -> None:
+     if not _send_telegram(message):
+        telegram_queue.append({"msg": message, "retries": 0, "ts": datetime.utcnow()})
 
 
-class TelegramNotifier:
-    """Simple wrapper around python-telegram-bot for sending alerts."""
+def retry_failed_alerts() -> None:
+    for alert in list(telegram_queue):
+        if alert["retries"] >= MAX_RETRIES:
+            print(f"⚠️ Telegram failed for: {alert['msg']}")
+            telegram_queue.remove(alert)
+            continue
+        if _send_telegram(alert["msg"]):
+            telegram_queue.remove(alert)
+        else:
+            alert["retries"] += 1
+            time.sleep(2 ** alert["retries"])
 
-    def __init__(self, token: str, chat_id: str, metrics: Optional[object] = None) -> None:
-        self.bot = Bot(token)
-        self.chat_id = chat_id
-        self.metrics = metrics
 
-    def send_message(self, text: str) -> None:
-        try:
-            self.bot.send_message(chat_id=self.chat_id, text=text)
-        except TelegramError as exc:
-            print(f"Telegram error: {exc}")
+def alert_trade_opened(symbol: str, timeframe: str, direction: str, entry: float, sl: float, tp: float) -> None:
+    msg = (
+        f"📈 Trade opened {symbol} {timeframe} {direction.upper()}\n"
+        f"Entry: {entry} SL: {sl} TP: {tp}"
+    )
+    _notify(msg)
 
-    def send_trade_alert(self, order: dict) -> None:
-        msg = (
-            f"Trade: {order.get('side')} {order.get('symbol')} "
-            f"qty={order.get('qty')} price={order.get('price')}"
-        )
-        self.send_message(msg)
 
-    def send_error(self, message: str) -> None:
-        self.send_message(f"Error: {message}")
+def alert_sl_moved(symbol: str, timeframe: str, new_sl: float) -> None:
+    msg = f"🔔 SL moved for {symbol} {timeframe} -> {new_sl}"
+    _notify(msg)
 
-    def send_summary(self) -> None:
-        if not self.metrics:
-            return
-        balance = getattr(self.metrics, "balance", 0.0)
-        pnl = getattr(self.metrics, "pnl", lambda: 0.0)()
-        self.send_message(f"Account balance: {balance:.2f}\nPnL: {pnl:.2f}")
 
-    def schedule_summary(self) -> None:
-        if self.metrics:
-            schedule.every().hour.do(self.send_summary)
+def alert_trade_closed(symbol: str, timeframe: str, reason: str) -> None:
+    msg = f"✅ Trade closed {symbol} {timeframe} ({reason})"
+    _notify(msg)
+
+
+def alert_daily_guard(reason: str) -> None:
+    msg = f"🚫 Daily guard triggered: {reason}"
+    _notify(msg)

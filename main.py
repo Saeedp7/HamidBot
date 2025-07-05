@@ -11,7 +11,7 @@ from analysis.replay_engine import ReplayEngine
 from utils.trade_logger import TradeLogger
 from data.market_data_collector import MarketDataCollector
 from utils.logger import get_logger
-from utils.telegram_notifier import TelegramNotifier
+from utils.telegram_notifier import send_telegram_alert
 from dashboard.dashboard import metrics, start_dashboard
 import schedule
 import threading
@@ -93,11 +93,11 @@ def run_demo(use_real_api: bool = False, use_collector: bool = True) -> None:
     active_strategy = selector.select()
     logger.info("Selected strategy: %s", active_strategy.name)
 
-    token = os.environ.get("TELEGRAM_TOKEN")
-    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    token = os.getenv("TELEGRAM_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
     notifier = None
     if token and chat_id:
-        notifier = TelegramNotifier(token, chat_id, metrics)
+        notifier = send_telegram_alert(metrics)
         notifier.schedule_summary()
 
     dashboard_thread = threading.Thread(target=start_dashboard, daemon=True)

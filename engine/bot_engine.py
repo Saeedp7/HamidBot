@@ -2,7 +2,7 @@ from strategies.base import BaseStrategy
 from execution.order_manager import OrderManager
 from risk.risk_manager import RiskManager
 from dashboard.dashboard import PerformanceMetrics
-from utils.telegram_notifier import TelegramNotifier
+from utils.telegram_notifier import send_telegram_alert
 
 
 class BotEngine:
@@ -14,7 +14,7 @@ class BotEngine:
         order_manager: OrderManager,
         risk_manager: RiskManager,
         metrics: PerformanceMetrics | None = None,
-        notifier: TelegramNotifier | None = None,
+        notifier:  None = None,
         initial_balance: float = 1.0,
     ) -> None:
         self.strategy = strategy
@@ -36,7 +36,7 @@ class BotEngine:
                 self.metrics.record_trade("buy", qty, price)
                 self.balance = self.metrics.balance
             if self.notifier:
-                self.notifier.send_trade_alert(order)
+                self.notifier.send_telegram_alert(order)
         elif self.strategy.should_sell():
             qty = self.risk_manager.size_position(self.balance, price)
             order = self.order_manager.place_order("SELL", "BTCUSDT", qty, price)
@@ -44,4 +44,4 @@ class BotEngine:
                 self.metrics.record_trade("sell", qty, price)
                 self.balance = self.metrics.balance
             if self.notifier:
-                self.notifier.send_trade_alert(order)
+                self.notifier.send_telegram_alert(order)
