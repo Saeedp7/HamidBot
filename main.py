@@ -3,6 +3,11 @@ from execution.order_manager import OrderManager
 from engine.bot_engine import BotEngine
 from risk.risk_manager import RiskManager
 from strategies.ema_crossover import EMACrossoverStrategy
+from strategies.mean_reversion import MeanReversionStrategy
+from engine.score_manager import ScoreManager
+from engine.strategy_selector import StrategySelector
+from engine.regime_detector import RegimeDetector
+from analysis.replay_engine import ReplayEngine
 from utils.trade_logger import TradeLogger
 from data.market_data_collector import MarketDataCollector
 from utils.logger import get_logger
@@ -19,43 +24,72 @@ class DummyBroker:
         order = {"side": side, "symbol": symbol, "qty": qty, "price": price}
         print(f"Limit order: {order}")
         return order
-    
-def _extract_close(candle: object) -> float | None:
-    """Best-effort extraction of close price from a candle."""
+
+def _extract_hlc(candle: object) -> dict[str, float] | None:
+    """Best-effort extraction of high/low/close data from a candle."""
     if isinstance(candle, dict):
-        for key in ("close", "c", "closePrice"):
-            if key in candle:
-                try:
-                    return float(candle[key])
-                except (TypeError, ValueError):
-                    return None
+        try:
+            return {
+                "high": float(candle.get("high", candle.get("h"))),
+                "low": float(candle.get("low", candle.get("l"))),
+                "close": float(candle.get("close", candle.get("c", candle.get("closePrice")))),
+            }
+        except (TypeError, ValueError):
+            return None
     if isinstance(candle, (list, tuple)) and len(candle) >= 5:
         try:
-            return float(candle[4])
+            return {"high": float(candle[2]), "low": float(candle[3]), "close": float(candle[4])}
         except (TypeError, ValueError):
             return None
     return None
 
+def _extract_close(candle: object) -> float | None:
+    data = _extract_hlc(candle)
+    return data["close"] if data else None
+
 
 def run_demo(use_real_api: bool = False, use_collector: bool = True) -> None:
     logger = get_logger("main")
-    strategy = EMACrossoverStrategy()
+
+    strategies = {
+        "trend": EMACrossoverStrategy(),
+        "mean": MeanReversionStrategy(),
+    }
+    score_manager = ScoreManager()
+    selector = StrategySelector(strategies, score_manager, epsilon=0.2)
+    regime_detector = RegimeDetector()
     broker = BrokerAPI() if use_real_api else DummyBroker()
     trade_logger = TradeLogger()
     order_manager = OrderManager(broker, logger=trade_logger)
     risk_manager = RiskManager()
-    engine = BotEngine(strategy, order_manager, risk_manager)
 
     if use_collector:
         collector = MarketDataCollector("ETHUSDT", timeframe="5m", limit=20)
         candles = collector.fetch_ohlcv()
         logger.info("Fetched %d candles", len(candles))
         logger.info("First candle: %s", candles[0] if candles else "no data")
-        prices = [c for c in (_extract_close(c) for c in candles) if c is not None]
     else:
-        prices = [100, 101, 102, 103, 102, 101, 104, 105, 104]
+        candles = [[0, p, p, p, p, 1] for p in [100, 101, 102, 103, 102, 101, 104, 105, 104]]
+
+    prices = []
+    for candle in candles:
+        data = _extract_hlc(candle)
+        if not data:
+            continue
+        regime_detector.on_data(data)
+        prices.append(data["close"])
+
+    # Score strategies using historical replay
+    scores = ReplayEngine(selector).run(prices)
+    logger.info("Strategy scores: %s", scores)
+
+    # Pick the best strategy based on scores
+    active_strategy = selector.select()
+    logger.info("Selected strategy: %s", active_strategy.name)
+
+    engine = BotEngine(active_strategy, order_manager, risk_manager)
     for price in prices:
-        logger.info("Price %.2f", price)
+        logger.info("Price %.2f (%s)", price, regime_detector.detect())
         engine.on_price_update(price)
 
     trade_logger.close()
