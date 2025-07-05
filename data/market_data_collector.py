@@ -43,9 +43,10 @@ def _convert_to_dataframe(rows: List[Dict[str, Any]]) -> pd.DataFrame:
 
 
 class MarketDataCollector:
-    def __init__(self, save_dir: Union[str, Path] = "data/raw"):
+    def __init__(self, raw_save_dir: Path = Path("data/raw"), save_dir: Union[str, Path] = ("data/raw")):
         self.save_dir = Path(save_dir)
         self.save_dir.mkdir(parents=True, exist_ok=True)
+        self.raw_save_dir = raw_save_dir
 
     def _get_single_ohlcv(
         self, symbol: str, timeframe: str, limit: int = 100, save: bool = True
@@ -71,6 +72,8 @@ class MarketDataCollector:
             self.save_dir.mkdir(parents=True, exist_ok=True)
             raw_path = self.save_dir / f"{symbol}_{timeframe}.csv"
             df.to_csv(raw_path, index=False)
+            self.raw_save_dir.mkdir(parents=True, exist_ok=True)
+            df.to_csv(self.raw_save_dir / f"{symbol}_{timeframe}.csv", index=False)
         # Run feature engineering on the fetched data
         processed_df = preprocess_and_engineer_features(df)
 
