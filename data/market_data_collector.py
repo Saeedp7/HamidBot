@@ -2,7 +2,7 @@ import os
 from typing import Dict, Iterable, Tuple, Union
 
 import pandas as pd
-from api import coinex_api, binance_api
+from api import  fetch_api
 
 
 class MarketDataCollector:
@@ -36,23 +36,17 @@ class MarketDataCollector:
         self, symbol: str, timeframe: str, limit: int = 100, save: bool = True
     ) -> pd.DataFrame:
         try:
-            data = coinex_api.fetch_ohlcv(symbol, timeframe, limit)
+            data = fetch_api.fetch_ohlcv(symbol, timeframe, limit)
         except Exception as e:
-            print(f"Coinex failed: {e}")
+            print(f"BitUnix failed: {e}")
             data = None
-
-        if (not data) and self.fallback:
-            try:
-                data = binance_api.fetch_ohlcv(symbol, timeframe, limit)
-            except Exception as e:
-                print(f"Binance failed: {e}")
-                data = None
 
         if not data:
             df = self._generate_stub(timeframe, limit)
             if save:
                 os.makedirs("data/raw", exist_ok=True)
-                df.to_csv(f"data/raw/{symbol}_{timeframe}.csv", index=False)
+                safe_symbol = symbol.replace("/", "_")
+                df.to_csv(f"data/raw/{safe_symbol}_{timeframe}.csv", index=False)
             return df
 
         df = pd.DataFrame(
@@ -63,7 +57,8 @@ class MarketDataCollector:
 
         if save:
             os.makedirs("data/raw", exist_ok=True)
-            df.to_csv(f"data/raw/{symbol}_{timeframe}.csv", index=False)
+            safe_symbol = symbol.replace("/", "_")
+            df.to_csv(f"data/raw/{safe_symbol}_{timeframe}.csv", index=False)
 
         return df
 
