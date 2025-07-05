@@ -33,7 +33,13 @@ class AICoordinator:
             if data is None:
                 continue
             sig = strat.generate_signal(data)
-            signals[name] = sig if isinstance(sig, Signal) else Signal(str(sig))
+            if isinstance(sig, Signal):
+                signals[name] = sig
+            else:
+                signals[name] = strat._signal(action=str(sig))
+            print(
+                f"Generated signal {signals[name].action} ({signals[name].confidence:.2f}) for {signals[name].symbol} via {signals[name].strategy_name}"
+            )
         return signals
 
     def allocate(self, signals: Dict[str, Signal]) -> Dict[str, float]:

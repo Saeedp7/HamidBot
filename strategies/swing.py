@@ -24,24 +24,24 @@ class SwingBot(BaseStrategy):
 
     def generate_signal(self, df: pd.DataFrame) -> Signal:
         if len(df) < max(self.ema_fast, self.sma_slow) + 2:
-            return Signal("hold")
+            return self._signal("hold")
         ema_fast = df["close"].ewm(span=self.ema_fast, adjust=False).mean().iloc[-1]
         sma_slow = df["close"].rolling(self.sma_slow).mean().iloc[-1]
         macd_val = macd(df["close"].tolist())
         rsi_val = rsi(df["close"].tolist())
         if not macd_val or rsi_val is None:
-            return Signal("hold")
+            return self._signal("hold")
         macd_line, macd_signal = macd_val
         if (
             ema_fast > sma_slow
             and macd_line > macd_signal
             and rsi_val < 70
         ):
-            return Signal("buy", 0.6)
+            return self._signal("buy", 0.6)
         if (
             ema_fast < sma_slow
             and macd_line < macd_signal
             and rsi_val > 30
         ):
-            return Signal("sell", 0.6)
-        return Signal("hold")
+            return self._signal("sell", 0.6)
+        return self._signal("hold")

@@ -19,13 +19,13 @@ class NewsSentimentBot(BaseStrategy):
 
     def generate_signal(self, texts: Iterable[str]) -> Signal:
         if not _sentiment or not texts:
-            return Signal("hold")
+            return self._signal("hold")
         joined = "\n".join(texts)
         result = _sentiment(joined[:512])[0]
         label = result.get("label", "neutral").lower()
         score = float(result.get("score", 0))
         if label == "positive" and score > 0.6:
-            return Signal("buy", score)
+            return self._signal("buy", score)
         if label == "negative" and score > 0.6:
-            return Signal("sell", score)
-        return Signal("hold")
+            return self._signal("sell", score)
+        return self._signal("hold")

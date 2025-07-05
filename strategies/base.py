@@ -1,17 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Optional
-
-
-@dataclass
-class Signal:
-    """Standard representation for strategy signals."""
-
-    action: str  # 'buy', 'sell' or 'hold'
-    confidence: float = 0.0
-    sl: Optional[float] = None
-    tp: Optional[float] = None
+from core.signal import Signal
+import time
 
 
 class BaseStrategy:
@@ -22,6 +13,25 @@ class BaseStrategy:
         self.symbol = symbol
         self.timeframe = timeframe
         self.risk_pct = risk_pct
+
+    # --------------------------------------------------------------
+    def _signal(
+        self,
+        action: str = "hold",
+        confidence: float = 0.0,
+        sl: Optional[float] = None,
+        tp: Optional[float] = None,
+    ) -> Signal:
+        return Signal(
+            action=action,
+            confidence=confidence,
+            sl=sl,
+            tp=tp,
+            symbol=self.symbol,
+            timeframe=self.timeframe,
+            timestamp=int(time.time() * 1000),
+            strategy_name=self.name,
+        )
 
     def on_data(self, price: float) -> None:
         """Receive new price data."""

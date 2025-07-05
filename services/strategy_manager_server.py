@@ -7,8 +7,12 @@ from typing import Dict, Any
 
 from services.grpc import strategy_manager_pb2, strategy_manager_pb2_grpc
 from engine.score_manager import ScoreManager
+
+from core.signal import Signal
+
 from risk.risk_manager import RiskManager
 from storage.strategy_score_store import StrategyScoreStore
+
 
 
 class ExecutionRouter:
@@ -34,6 +38,33 @@ class StrategyManager(strategy_manager_pb2_grpc.StrategyManagerServicer):
         self.daily_loss = 0.0
         self._load_scores()
         self._log_writer = None
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _pb_to_signal(msg: strategy_manager_pb2.SignalMessage) -> Signal:
+        return Signal(
+            action=msg.signal_type,
+            confidence=msg.confidence,
+            sl=msg.sl if msg.sl else None,
+            tp=msg.tp if msg.tp else None,
+            symbol=msg.symbol,
+            timeframe=msg.timeframe,
+            timestamp=int(datetime.utcnow().timestamp() * 1000),
+            strategy_name=msg.strategy_name,
+        )
+
+    @staticmethod
+    def _signal_to_pb(signal: Signal, entry_price: float = 0.0) -> strategy_manager_pb2.SignalMessage:
+        return strategy_manager_pb2.SignalMessage(
+            strategy_name=signal.strategy_name,
+            symbol=signal.symbol,
+            timeframe=signal.timeframe,
+            signal_type=signal.action,
+            confidence=signal.confidence,
+            entry_price=entry_price,
+            sl=signal.sl or 0.0,
+            tp=signal.tp or 0.0,
+        )
 
     # ------------------------------------------------------------------
     def _load_scores(self) -> None:
@@ -62,10 +93,14 @@ class StrategyManager(strategy_manager_pb2_grpc.StrategyManagerServicer):
 
     # ------------------------------------------------------------------
     def SendSignal(self, request: strategy_manager_pb2.SignalMessage, context: grpc.ServicerContext) -> strategy_manager_pb2.ExecutionResponse:
-        name = request.strategy_name
+        sig = self._pb_to_signal(request)
+        print(
+            f"Received {sig.strategy_name} signal {sig.action} ({sig.confidence:.2f}) for {sig.symbol}"
+        )
+        name = sig.strategy_name
         profile = self.risk_profiles.get(name, self.risk_profiles["default"])
-        regime_match = 1.0 if request.timeframe in profile.get("preferred_timeframes", []) else 0.5
-        reward = request.confidence * regime_match
+        regime_match = 1.0 if sig.timeframe in profile.get("preferred_timeframes", []) else 0.5
+        reward = sig.confidence * regime_match
         score = self.score_manager.update_score(name, reward)
 
         scores = self.score_manager.get_all()
@@ -81,18 +116,18 @@ class StrategyManager(strategy_manager_pb2_grpc.StrategyManagerServicer):
             return strategy_manager_pb2.ExecutionResponse(message="drawdown limit")
 
         # basic safety: prevent duplicate orders per symbol
-        last_side = self.active_symbols.get(request.symbol)
-        if last_side and last_side == request.signal_type:
+        last_side = self.active_symbols.get(sig.symbol)
+        if last_side and last_side == sig.action:
             message = "duplicate signal ignored"
             return strategy_manager_pb2.ExecutionResponse(message=message)
-        self.active_symbols[request.symbol] = request.signal_type
+        self.active_symbols[sig.symbol] = sig.action
 
         order = {
-            "symbol": request.symbol,
-            "side": request.signal_type,
+            "symbol": sig.symbol,
+            "side": sig.action,
             "size": size,
-            "sl": request.sl,
-            "tp": request.tp,
+            "sl": sig.sl,
+            "tp": sig.tp,
         }
         self.execution_router.execute(order)
         self.daily_loss += -reward if reward < 0 else 0.0
@@ -101,11 +136,11 @@ class StrategyManager(strategy_manager_pb2_grpc.StrategyManagerServicer):
         writer.writerow([
             datetime.utcnow().isoformat(),
             name,
-            request.symbol,
-            request.signal_type,
+            sig.symbol,
+            sig.action,
             f"{size:.6f}",
-            request.sl,
-            request.tp,
+            sig.sl,
+            sig.tp,
         ])
         self.score_store.update_score(name, reward)
         self._save_scores()
