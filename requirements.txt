@@ -58,3 +58,4 @@ transformers>=4.40.0
 py_vollib>=1.0.1
 grpcio>=1.73.1
 grpcio-tools>=1.73.1
+stable-baselines3>=2.3.0
