@@ -1,30 +1,38 @@
-import numpy as np
+import os
+import random
 import sys
 from pathlib import Path
 
-# Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from core.rl_arbitrator import RLArbitrator
-from core.rl_trainer import RLTrainer
+
+
+STRATEGIES = [
+    "ScalperBot",
+    "SwingBot",
+    "ArbitrageBot",
+    "GridBot",
+    "NewsSentimentBot",
+    "MeanReversionBot",
+    "BreakoutBot",
+    "LiquiditySweepBot",
+    "DCAInvestmentBot",
+    "OptionsHedgerBot",
+]
+
+
+def main(episodes: int = 1000) -> None:
+    os.makedirs("models", exist_ok=True)
+    arbitrator = RLArbitrator(STRATEGIES)
+    for _ in range(episodes):
+        name = arbitrator.select_strategy("BTCUSDT", "1h")
+        reward = random.uniform(-1, 1)
+        arbitrator.update_rewards(name, reward)
+        arbitrator.decay_scores()
+    arbitrator.save()
+    print("Training complete. Model saved to", arbitrator.model_path)
+
 
 if __name__ == "__main__":
-    strategies = ["ScalperBot", "SwingBot", "GridBot", "DCAInvestmentBot"]
-    state_dim = 10
-    agent = RLArbitrator(strategies=strategies, state_dim=state_dim)
-    trainer = RLTrainer(arbitrator=agent)
-
-    for _ in range(1000):
-        state = np.random.rand(state_dim).astype(np.float32)
-        action_idx = agent.model.predict(state, deterministic=True)[0]
-        reward = np.random.normal(loc=1.0 if action_idx == 1 else 0.2)  # Fake reward logic
-        next_state = np.random.rand(state_dim).astype(np.float32)
-
-        trainer.record_transition(
-            state=state,
-            action=action_idx,
-            reward=reward,
-            next_state=next_state
-        )
-
-    print("✅ RL training completed and model saved.")
+    main()

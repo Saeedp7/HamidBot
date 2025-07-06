@@ -1,61 +1,59 @@
-from __future__ import annotations
-
-import os
-from typing import Iterable
-
+import json
 import numpy as np
-import gymnasium as gym
-from gymnasium import spaces
-from stable_baselines3 import DQN
-
-
-class _DummyEnv(gym.Env):
-    """Minimal env to satisfy Stable Baselines"""
-
-    def __init__(self, state_dim: int, n_actions: int) -> None:
-        super().__init__()
-        self.observation_space = spaces.Box(-np.inf, np.inf, shape=(state_dim,), dtype=np.float32)
-        self.action_space = spaces.Discrete(n_actions)
-
-    def reset(self, *, seed: int | None = None, options: dict | None = None):
-        return np.zeros(self.observation_space.shape, dtype=np.float32), {}
-
-    def step(self, action):
-        obs = np.zeros(self.observation_space.shape, dtype=np.float32)
-        return obs, 0.0, False, False, {}
+from typing import Iterable, List
+from gym import spaces
 
 
 class RLArbitrator:
-    """Wrapper around a DQN agent for strategy selection."""
+    """Simple epsilon-greedy Q-learning arbitrator."""
 
     def __init__(
         self,
-        strategies: Iterable[str],
-        state_dim: int,
-        model_path: str = "models/rl_arbitrator.zip",
-        trainer: "RLTrainer | None" = None,
+        strategies: List[str],
+        epsilon: float = 0.1,
+        lr: float = 0.2,
+        decay: float = 0.99,
+        model_path: str = "models/rl_arbitrator.json",
     ) -> None:
-        self.strategy_names = list(strategies)
-        self.state_dim = state_dim
+        self.strategies = list(strategies)
+        self.action_space = spaces.Discrete(len(self.strategies))
+        self.epsilon = epsilon
+        self.lr = lr
+        self.decay = decay
         self.model_path = model_path
-        self.trainer = trainer
-        self.env = _DummyEnv(state_dim, len(self.strategy_names))
-        if os.path.exists(model_path) and os.path.getsize(model_path) > 0:
-            self.model = DQN.load(model_path, env=self.env)
+        self.q_values = np.zeros(len(self.strategies))
+        self.load()
+
+    # ------------------------------------------------------------------
+    def load(self) -> None:
+        try:
+            with open(self.model_path, "r") as f:
+                data = json.load(f)
+                q = data.get("q_values")
+                if isinstance(q, list) and len(q) == len(self.strategies):
+                    self.q_values = np.array(q, dtype=float)
+        except FileNotFoundError:
+            pass
+
+    def save(self) -> None:
+        with open(self.model_path, "w") as f:
+            json.dump({"q_values": self.q_values.tolist()}, f)
+
+    # ------------------------------------------------------------------
+    def select_strategy(
+        self, symbol: str, timeframe: str, strategies: Iterable[str] | None = None
+    ) -> str:
+        """Return a strategy name based on epsilon-greedy policy."""
+        if np.random.rand() < self.epsilon:
+            action = self.action_space.sample()
         else:
-            self.model = DQN("MlpPolicy", self.env, verbose=0)
-        self.name_from_action = {i: n for i, n in enumerate(self.strategy_names)}
-        self.last_state: np.ndarray | None = None
-        self.last_action: int | None = None
+            action = int(np.argmax(self.q_values))
+        return self.strategies[action]
 
-    def select_strategy(self, state: np.ndarray) -> str:
-        action, _ = self.model.predict(state, deterministic=True)
-        self.last_state = state
-        self.last_action = int(action)
-        return self.name_from_action[self.last_action]
+    def update_rewards(self, strategy_name: str, reward: float) -> None:
+        if strategy_name in self.strategies:
+            idx = self.strategies.index(strategy_name)
+            self.q_values[idx] += self.lr * (reward - self.q_values[idx])
 
-    def update(self, reward: float, next_state: np.ndarray) -> None:
-        if self.last_state is None or self.last_action is None:
-            return
-        if self.trainer is not None:
-            self.trainer.record_transition(self.last_state, self.last_action, reward, next_state)
+    def decay_scores(self) -> None:
+        self.q_values *= self.decay

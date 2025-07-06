@@ -5,8 +5,7 @@ from typing import Dict, Iterable, Any
 from strategies.base import BaseStrategy, Signal
 from strategies import load_strategy
 from .score_manager import ScoreManager
-from core.arbitration_engine import ArbitrationEngine
-from ai import RLArbitrator
+from core.rl_arbitrator import RLArbitrator
 from storage.strategy_score_store import StrategyScoreStore
 
 
@@ -21,18 +20,26 @@ class AICoordinator:
     ) -> None:
         self.score_manager = ScoreManager()
         self.score_store = StrategyScoreStore()
+        self.arbitration_engine = RLArbitrator(
+            [
+                "ScalperBot",
+                "SwingBot",
+                "ArbitrageBot",
+                "GridBot",
+                "NewsSentimentBot",
+                "MeanReversionBot",
+                "BreakoutBot",
+                "LiquiditySweepBot",
+                "DCAInvestmentBot",
+                "OptionsHedgerBot",
+            ]
+        )
         self.capital = capital
-        self.use_rl = use_rl
         self.strategies: Dict[str, BaseStrategy] = {}
         for name, cfg in strategy_configs.items():
             cls = load_strategy(cfg.pop("module"))
             self.strategies[name] = cls(**cfg)
-        self.arbitration_engine = ArbitrationEngine(self.strategies.keys(), self.score_manager)
-        if use_rl:
-            try:
-                self.arbitration_engine = RLArbitrator(self.strategies.keys())
-            except Exception as exc:  # pragma: no cover
-                print(f"Falling back to MAB: {exc}")
+
 
     def choose_strategy(self, symbol: str, timeframe: str, market_state: Dict[str, Any]) -> BaseStrategy:
         name = self.arbitration_engine.select_strategy(symbol, timeframe, market_state)
