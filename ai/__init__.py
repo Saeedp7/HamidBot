@@ -1,1 +1,1 @@
-from ..core.rl_arbitrator import RLArbitrator
+from core.rl_arbitrator import RLArbitrator

@@ -56,6 +56,10 @@ class RLTrainer:
         if self.replay_buffer.size() < self.batch_size:
             return
         self.arbitrator.model.replay_buffer = self.replay_buffer
-        self.arbitrator.model.train(batch_size=self.batch_size, gradient_steps=1)
+        self.arbitrator.model.learn(
+            total_timesteps=self.batch_size,
+            reset_num_timesteps=False,
+            log_interval=None
+        )
         os.makedirs(os.path.dirname(self.save_path), exist_ok=True)
         self.arbitrator.model.save(self.save_path)
