@@ -5,7 +5,7 @@ from typing import Dict, Iterable, Any
 from strategies.base import BaseStrategy, Signal
 from strategies import load_strategy
 from .score_manager import ScoreManager
-from ai.arbitration_engine import ArbitrationEngine
+from core.arbitration_engine import ArbitrationEngine
 from ai import RLArbitrator
 from storage.strategy_score_store import StrategyScoreStore
 
@@ -21,29 +21,21 @@ class AICoordinator:
     ) -> None:
         self.score_manager = ScoreManager()
         self.score_store = StrategyScoreStore()
-        self.arbitration_engine = ArbitrationEngine()
         self.capital = capital
         self.use_rl = use_rl
         self.strategies: Dict[str, BaseStrategy] = {}
         for name, cfg in strategy_configs.items():
             cls = load_strategy(cfg.pop("module"))
             self.strategies[name] = cls(**cfg)
+        self.arbitration_engine = ArbitrationEngine(self.strategies.keys(), self.score_manager)
         if use_rl:
             try:
                 self.arbitration_engine = RLArbitrator(self.strategies.keys())
             except Exception as exc:  # pragma: no cover
                 print(f"Falling back to MAB: {exc}")
 
-    def choose_strategy(
-        self, symbol: str, timeframe: str, context: Dict[str, Any] | None = None
-    ) -> BaseStrategy:
-        if self.use_rl and context is not None:
-            name = self.arbitration_engine.select_strategy(context)
-        else:
-            name = self.arbitration_engine.select_strategy(
-                symbol, timeframe, self.strategies.keys()
-            )
-        name = self.arbitration_engine.select_strategy(symbol, timeframe, self.strategies.keys())
+    def choose_strategy(self, symbol: str, timeframe: str, market_state: Dict[str, Any]) -> BaseStrategy:
+        name = self.arbitration_engine.select_strategy(symbol, timeframe, market_state)
         return self.strategies[name]
 
     def process(self, market_data: Dict[str, Any]) -> Dict[str, Signal]:
@@ -80,18 +72,8 @@ class AICoordinator:
         return allocations
 
     # ------------------------------------------------------------------
-    def update_performance(
-        self,
-        strategy_name: str,
-        result: float,
-        context: Dict[str, Any] | None = None,
-        next_context: Dict[str, Any] | None = None,
-        done: bool = False,
-    ) -> None:
+    def update_performance(self, strategy_name: str, result: float, market_state: Dict[str, Any]) -> None:
         """Update internal reward trackers."""
-        if self.use_rl and context is not None and next_context is not None:
-            self.arbitration_engine.update(result, next_context, done)
-        else:
-            self.arbitration_engine.update_rewards(strategy_name, result)
+        self.arbitration_engine.update_rewards(strategy_name, result, market_state.get("symbol", ""), market_state.get("timeframe", ""), market_state)
         self.score_store.update_score(strategy_name, result)
         self.score_store.save()
