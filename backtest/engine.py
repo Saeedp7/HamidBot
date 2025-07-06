@@ -34,6 +34,7 @@ class BacktestEngine:
         data: Dict[Tuple[str, str], pd.DataFrame],
         strategies: List[BaseStrategy],
         config: Dict[str, float] | None = None,
+        rl_arbitrator=None,
     ) -> None:
         self.data = data
         self.strategies = strategies
@@ -48,6 +49,7 @@ class BacktestEngine:
         self.equity = self.config["initial_balance"]
         self.equity_curve: List[float] = [self.equity]
         self.strategy_results: Dict[str, List[float]] = {s.name: [] for s in strategies}
+        self.rl_arbitrator = rl_arbitrator
 
     def _apply_slippage(self, price: float, side: str) -> float:
         adj = price * self.config["slippage_pct"]
@@ -105,22 +107,25 @@ class BacktestEngine:
                     self.equity += pnl
                     self.equity_curve.append(self.equity)
                     self.strategy_results[strategy.name].append(pnl)
-                    self.trade_log.append(
-                        Trade(
-                            strategy=strategy.name,
-                            symbol=symbol,
-                            timeframe=timeframe,
-                            side=position,
-                            entry_time=entry_time,
-                            exit_time=row["timestamp"],
-                            entry_price=entry_price,
-                            exit_price=exit_price,
-                            sl=sl,
-                            tp=tp,
-                            qty=qty,
-                            pnl=pnl,
-                        )
+                    trade = Trade(
+                        strategy=strategy.name,
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        side=position,
+                        entry_time=entry_time,
+                        exit_time=row["timestamp"],
+                        entry_price=entry_price,
+                        exit_price=exit_price,
+                        sl=sl,
+                        tp=tp,
+                        qty=qty,
+                        pnl=pnl,
                     )
+                    self.trade_log.append(trade)
+                    if self.rl_arbitrator is not None:
+                        reward = 1.0 if pnl > 0 else -1.0
+                        next_state = np.array([pnl])
+                        self.rl_arbitrator.update(reward, next_state)
                     position = None
                     sl = None
                     tp = None
@@ -133,27 +138,41 @@ class BacktestEngine:
             self.equity += pnl
             self.equity_curve.append(self.equity)
             self.strategy_results[strategy.name].append(pnl)
-            self.trade_log.append(
-                Trade(
-                    strategy=strategy.name,
-                    symbol=symbol,
-                    timeframe=timeframe,
-                    side=position,
-                    entry_time=entry_time,
-                    exit_time=df.iloc[-1]["timestamp"],
-                    entry_price=entry_price,
-                    exit_price=exit_price,
-                    sl=sl,
-                    tp=tp,
-                    qty=qty,
-                    pnl=pnl,
-                )
+            trade = Trade(
+                strategy=strategy.name,
+                symbol=symbol,
+                timeframe=timeframe,
+                side=position,
+                entry_time=entry_time,
+                exit_time=df.iloc[-1]["timestamp"],
+                entry_price=entry_price,
+                exit_price=exit_price,
+                sl=sl,
+                tp=tp,
+                qty=qty,
+                pnl=pnl,
             )
+            self.trade_log.append(trade)
+            if self.rl_arbitrator is not None:
+                reward = 1.0 if pnl > 0 else -1.0
+                next_state = np.array([pnl])
+                self.rl_arbitrator.update(reward, next_state)
 
     def run(self) -> None:
         for (symbol, timeframe), df in self.data.items():
-            for strategy in self.strategies:
-                if strategy.symbol == symbol and strategy.timeframe == timeframe:
+            candidates = [
+                s for s in self.strategies if s.symbol == symbol and s.timeframe == timeframe
+            ]
+            if not candidates:
+                continue
+            if self.rl_arbitrator is not None:
+                name = self.rl_arbitrator.select_strategy(
+                    symbol, timeframe, [s.name for s in candidates]
+                )
+                strategy = next(s for s in candidates if s.name == name)
+                self._run_single(strategy, df, symbol, timeframe)
+            else:
+                for strategy in candidates:
                     self._run_single(strategy, df, symbol, timeframe)
 
     # Metrics

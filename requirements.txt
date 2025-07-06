@@ -59,3 +59,4 @@ py_vollib>=1.0.1
 grpcio>=1.73.1
 grpcio-tools>=1.73.1
 stable-baselines3>=2.3.0
+gymnasium>=0.29.1

@@ -1,65 +1,54 @@
 from __future__ import annotations
 
-import os
-from typing import List
-
+from typing import Iterable
 import numpy as np
-from stable_baselines3.common.buffers import ReplayBuffer
+import gymnasium as gym
+
+from stable_baselines3.common.base_class import BaseAlgorithm
+from stable_baselines3 import PPO, DQN
+
+
+class ReplayEnv(gym.Env):
+    """Environment that replays recorded transitions."""
+
+    def __init__(self, transitions: Iterable[tuple], obs_space: gym.Space, act_space: gym.Space) -> None:
+        super().__init__()
+        self.transitions = list(transitions)
+        self.observation_space = obs_space
+        self.action_space = act_space
+        self.idx = 0
+
+    def reset(self, *, seed=None, options=None):
+        self.idx = 0
+        return self.transitions[0][0], {}
+
+    def step(self, action):  # pragma: no cover - simple replay
+        s, a, r, n, d = self.transitions[self.idx]
+        self.idx += 1
+        return n, r, d, False, {}
 
 
 class RLTrainer:
-    """Simple replay buffer trainer for RLArbitrator."""
+    """Train RL arbitrator from recorded transitions."""
 
-    def __init__(
-        self,
-        arbitrator,
-        save_path: str = "models/rl_arbitrator.zip",
-        buffer_size: int = 10000,
-        batch_size: int = 32,
-        train_freq: int = 10,
-    ) -> None:
+    def __init__(self, arbitrator, batch_size: int = 32) -> None:
         self.arbitrator = arbitrator
-        self.save_path = save_path
         self.batch_size = batch_size
-        self.train_freq = train_freq
-        self.env = arbitrator.env
-        self.replay_buffer = ReplayBuffer(
-            buffer_size,
-            self.env.observation_space,
-            self.env.action_space,
-            device=arbitrator.model.device,
-            optimize_memory_usage=False,
-            handle_timeout_termination=False,
-        )
-        self.steps = 0
 
-    def record_transition(
-        self,
-        state: np.ndarray,
-        action: int,
-        reward: float,
-        next_state: np.ndarray,
-    ) -> None:
-        self.replay_buffer.add(
-            state,
-            next_state,
-            np.array([action]),
-            np.array([reward], dtype=np.float32),
-            np.array([0.0], dtype=np.float32),
-            [{}],
-        )
-        self.steps += 1
-        if self.steps % self.train_freq == 0:
-            self._train()
-
-    def _train(self) -> None:
-        if self.replay_buffer.size() < self.batch_size:
+    # --------------------------------------------------------------
+    def train(self, epochs: int = 1) -> None:
+        if not self.arbitrator.memory:
             return
-        self.arbitrator.model.replay_buffer = self.replay_buffer
-        self.arbitrator.model.learn(
-            total_timesteps=self.batch_size,
-            reset_num_timesteps=False,
-            log_interval=None
+        env = ReplayEnv(
+            self.arbitrator.memory,
+            self.arbitrator.env.observation_space,
+            self.arbitrator.env.action_space,
         )
-        os.makedirs(os.path.dirname(self.save_path), exist_ok=True)
-        self.arbitrator.model.save(self.save_path)
+        self.arbitrator.model.set_env(env)
+        steps = len(self.arbitrator.memory) * epochs
+        if isinstance(self.arbitrator.model, PPO):
+            self.arbitrator.model.learn(total_timesteps=steps)
+        else:
+            self.arbitrator.model.learn(total_timesteps=steps)
+        self.arbitrator.memory.clear()
+        env.close()
